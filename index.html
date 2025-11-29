@@ -1,0 +1,629 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Lip Reading System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            text-align: center;
+            border-bottom: 2px solid #00ff88;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #00ff88;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        .video-section {
+            flex: 2;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #00ff88;
+        }
+
+        .results-section {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 15px;
+            padding: 20px;
+            border: 2px solid #00ff88;
+        }
+
+        .video-container {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            margin: 0 auto;
+        }
+
+        #video {
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+            background: #000;
+        }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .controls {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #00ff88, #00cc6a);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+            transition: all 0.3s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.4);
+        }
+
+        .btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .status.success {
+            background: rgba(0, 255, 136, 0.2);
+            border: 1px solid #00ff88;
+        }
+
+        .status.error {
+            background: rgba(255, 82, 82, 0.2);
+            border: 1px solid #ff5252;
+        }
+
+        .results-header {
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            color: #00ff88;
+            text-align: center;
+        }
+
+        .prediction-box {
+            background: rgba(0, 0, 0, 0.8);
+            border: 2px solid #00ff88;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            min-height: 100px;
+        }
+
+        .prediction-text {
+            font-size: 1.2rem;
+            line-height: 1.5;
+            color: #fff;
+        }
+
+        .confidence-score {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #00ff88;
+        }
+
+        .metrics {
+            margin-top: 20px;
+        }
+
+        .metric-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+        }
+
+        .metric-value {
+            color: #00ff88;
+            font-weight: bold;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid #00ff88;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+        }
+
+        .landmark-dot {
+            fill: #00ff88;
+            stroke: #00ff88;
+            stroke-width: 1;
+        }
+
+        .landmark-line {
+            stroke: #00ff88;
+            stroke-width: 2;
+            fill: none;
+            stroke-dasharray: 5,5;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 AI Lip Reading System</h1>
+        <p>Real-time lip movement detection and speech prediction</p>
+    </div>
+
+    <div class="main-container">
+        <div class="video-section">
+            <h2>📹 Live Video Feed</h2>
+            <div class="video-container">
+                <video id="video" autoplay muted playsinline></video>
+                <canvas id="canvas"></canvas>
+            </div>
+            
+            <div class="controls">
+                <button id="startBtn" class="btn">Start Camera</button>
+                <button id="stopBtn" class="btn" disabled>Stop Camera</button>
+                <button id="trainBtn" class="btn"> new mode</button>
+            </div>
+            
+            <div id="status" class="status" style="display: none;"></div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Loading AI Model...</p>
+            </div>
+        </div>
+
+        <div class="results-section">
+            <h2 class="results-header">🗣️ Speech Prediction</h2>
+            
+            <div class="prediction-box">
+                <div class="prediction-text" id="predictionText">
+                    Ready to detect speech...
+                </div>
+                <div class="confidence-score" id="confidenceScore">
+                    Confidence: --
+                </div>
+            </div>
+
+            <div class="metrics">
+                <h3>📊 Performance Metrics</h3>
+                <div class="metric-item">
+                    <span>FPS:</span>
+                    <span class="metric-value" id="fps">--</span>
+                </div>
+                <div class="metric-item">
+                    <span>Inference Time:</span>
+                    <span class="metric-value" id="inferenceTime">--</span>
+                </div>
+                <div class="metric-item">
+                    <span>Landmarks Detected:</span>
+                    <span class="metric-value" id="landmarksCount">--</span>
+                </div>
+                <div class="metric-item">
+                    <span>Model Status:</span>
+                    <span class="metric-value" id="modelStatus">Loading...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Include TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    
+    <!-- Include MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+
+    <script>
+        class LipReadingSystem {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.isRunning = false;
+                this.model = null;
+                this.faceMesh = null;
+                this.frameBuffer = [];
+                this.maxFrames = 32;
+                this.vocabulary = ['hello', 'world', 'how', 'are', 'you', 'thank', 'please', 'good', 'morning', 'evening'];
+                this.lipLandmarks = [
+                    61, 84, 17, 314, 405, 320, 307, 375, 321, 308, 324, 318,
+                    402, 317, 14, 87, 178, 88, 95, 185, 40, 39, 37, 0, 269,
+                    270, 267, 271, 272, 11, 12, 13, 15, 16, 17, 18, 200
+                ];
+                
+                this.metrics = {
+                    fps: 0,
+                    inferenceTime: 0,
+                    landmarksCount: 0,
+                    lastFrameTime: Date.now()
+                };
+
+                this.initializeSystem();
+            }
+
+            async initializeSystem() {
+                try {
+                    await this.loadModel();
+                    await this.initializeFaceMesh();
+                    this.setupEventListeners();
+                    this.updateStatus('AI System Ready', 'success');
+                } catch (error) {
+                    console.error('Initialization error:', error);
+                    this.updateStatus('System initialization failed', 'error');
+                }
+            }
+
+            async loadModel() {
+                try {
+                    document.getElementById('loading').style.display = 'block';
+                    document.getElementById('modelStatus').textContent = 'Loading...';
+                    
+                    // Create a simple dummy model for demonstration
+                    this.model = await this.createDummyModel();
+                    
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('modelStatus').textContent = 'Loaded';
+                    console.log('Model loaded successfully');
+                } catch (error) {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('modelStatus').textContent = 'Error';
+                    throw error;
+                }
+            }
+
+            async createDummyModel() {
+                // Create a simple sequential model for demonstration
+                const model = tf.sequential({
+                    layers: [
+                        tf.layers.conv3d({
+                            inputShape: [32, 96, 96, 1],
+                            filters: 32,
+                            kernelSize: [3, 3, 3],
+                            activation: 'relu'
+                        }),
+                        tf.layers.maxPooling3d({
+                            poolSize: [2, 2, 2]
+                        }),
+                        tf.layers.conv3d({
+                            filters: 64,
+                            kernelSize: [3, 3, 3],
+                            activation: 'relu'
+                        }),
+                        tf.layers.maxPooling3d({
+                            poolSize: [2, 2, 2]
+                        }),
+                        tf.layers.flatten(),
+                        tf.layers.dense({
+                            units: 128,
+                            activation: 'relu'
+                        }),
+                        tf.layers.dense({
+                            units: this.vocabulary.length,
+                            activation: 'softmax'
+                        })
+                    ]
+                });
+
+                model.compile({
+                    optimizer: 'adam',
+                    loss: 'categoricalCrossentropy',
+                    metrics: ['accuracy']
+                });
+
+                return model;
+            }
+
+            async initializeFaceMesh() {
+                this.faceMesh = new FaceMesh({
+                    locateFile: (file) => {
+                        return `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`;
+                    }
+                });
+
+                this.faceMesh.setOptions({
+                    maxNumFaces: 1,
+                    refineLandmarks: true,
+                    minDetectionConfidence: 0.5,
+                    minTrackingConfidence: 0.5
+                });
+
+                this.faceMesh.onResults((results) => {
+                    this.processFaceMeshResults(results);
+                });
+            }
+
+            setupEventListeners() {
+                document.getElementById('startBtn').addEventListener('click', () => this.startCamera());
+                document.getElementById('stopBtn').addEventListener('click', () => this.stopCamera());
+                document.getElementById('trainBtn').addEventListener('click', () => this.enterTrainingMode());
+            }
+
+            async startCamera() {
+                try {
+                    const constraints = {
+                        video: {
+                            width: { ideal: 640 },
+                            height: { ideal: 480 },
+                            frameRate: { ideal: 30 }
+                        }
+                    };
+
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.video.srcObject = stream;
+                    
+                    this.video.onloadedmetadata = () => {
+                        this.canvas.width = this.video.videoWidth;
+                        this.canvas.height = this.video.videoHeight;
+                        this.isRunning = true;
+                        this.processVideoFrame();
+                        
+                        document.getElementById('startBtn').disabled = true;
+                        document.getElementById('stopBtn').disabled = false;
+                        this.updateStatus('Camera started successfully', 'success');
+                    };
+                } catch (error) {
+                    console.error('Camera access error:', error);
+                    this.updateStatus('Camera access failed. Please check permissions and use HTTPS.', 'error');
+                }
+            }
+
+            stopCamera() {
+                this.isRunning = false;
+                if (this.video.srcObject) {
+                    const tracks = this.video.srcObject.getTracks();
+                    tracks.forEach(track => track.stop());
+                    this.video.srcObject = null;
+                }
+                
+                document.getElementById('startBtn').disabled = false;
+                document.getElementById('stopBtn').disabled = true;
+                this.updateStatus('Camera stopped', 'success');
+                
+                // Clear canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            }
+
+            async processVideoFrame() {
+                if (!this.isRunning) return;
+
+                const currentTime = Date.now();
+                this.metrics.fps = Math.round(1000 / (currentTime - this.metrics.lastFrameTime));
+                this.metrics.lastFrameTime = currentTime;
+
+                // Send frame to MediaPipe
+                await this.faceMesh.send({ image: this.video });
+
+                // Continue processing
+                requestAnimationFrame(() => this.processVideoFrame());
+            }
+
+            processFaceMeshResults(results) {
+                // Clear canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+                    const landmarks = results.multiFaceLandmarks[0];
+                    this.drawLipLandmarks(landmarks);
+                    this.extractLipFeatures(landmarks);
+                    this.metrics.landmarksCount = landmarks.length;
+                } else {
+                    this.metrics.landmarksCount = 0;
+                }
+
+                this.updateMetrics();
+            }
+
+            drawLipLandmarks(landmarks) {
+                const lipIndices = [
+                    [61, 84, 17, 314, 405, 320, 307, 375, 321, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95],
+                    [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318]
+                ];
+
+                // Draw lip outline
+                this.ctx.strokeStyle = '#00ff88';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([5, 5]);
+
+                lipIndices.forEach(indices => {
+                    this.ctx.beginPath();
+                    indices.forEach((index, i) => {
+                        if (index < landmarks.length) {
+                            const x = landmarks[index].x * this.canvas.width;
+                            const y = landmarks[index].y * this.canvas.height;
+                            
+                            if (i === 0) {
+                                this.ctx.moveTo(x, y);
+                            } else {
+                                this.ctx.lineTo(x, y);
+                            }
+                        }
+                    });
+                    this.ctx.closePath();
+                    this.ctx.stroke();
+                });
+
+                // Draw landmark points
+                this.ctx.fillStyle = '#00ff88';
+                this.ctx.setLineDash([]);
+                
+                this.lipLandmarks.forEach(index => {
+                    if (index < landmarks.length) {
+                        const x = landmarks[index].x * this.canvas.width;
+                        const y = landmarks[index].y * this.canvas.height;
+                        
+                        this.ctx.beginPath();
+                        this.ctx.arc(x, y, 2, 0, 2 * Math.PI);
+                        this.ctx.fill();
+                    }
+                });
+            }
+
+            async extractLipFeatures(landmarks) {
+                try {
+                    // Extract lip region coordinates
+                    const lipRegion = this.getLipRegion(landmarks);
+                    
+                    // Add to frame buffer
+                    this.frameBuffer.push(lipRegion);
+                    if (this.frameBuffer.length > this.maxFrames) {
+                        this.frameBuffer.shift();
+                    }
+
+                    // Predict if we have enough frames
+                    if (this.frameBuffer.length === this.maxFrames) {
+                        await this.predictSpeech();
+                    }
+                } catch (error) {
+                    console.error('Feature extraction error:', error);
+                }
+            }
+
+            getLipRegion(landmarks) {
+                // Create a simplified lip region representation
+                const lipPoints = this.lipLandmarks.map(index => {
+                    if (index < landmarks.length) {
+                        return {
+                            x: landmarks[index].x,
+                            y: landmarks[index].y
+                        };
+                    }
+                    return { x: 0, y: 0 };
+                });
+
+                // Convert to a feature vector (simplified)
+                return lipPoints.flat().map(point => [point.x, point.y]).flat();
+            }
+
+            async predictSpeech() {
+                const startTime = Date.now();
+                
+                try {
+                    // Create dummy input tensor (in real implementation, use processed lip region)
+                    const dummyInput = tf.randomNormal([1, 32, 96, 96, 1]);
+                    
+                    // Run prediction
+                    const prediction = this.model.predict(dummyInput);
+                    const probabilities = await prediction.data();
+                    
+                    // Get predicted word
+                    const maxIndex = probabilities.indexOf(Math.max(...probabilities));
+                    const predictedWord = this.vocabulary[maxIndex] || 'unknown';
+                    const confidence = Math.round(probabilities[maxIndex] * 100);
+                    
+                    // Update UI
+                    document.getElementById('predictionText').textContent = predictedWord;
+                    document.getElementById('confidenceScore').textContent = `Confidence: ${confidence}%`;
+                    
+                    // Clean up tensors
+                    dummyInput.dispose();
+                    prediction.dispose();
+                    
+                    this.metrics.inferenceTime = Date.now() - startTime;
+                } catch (error) {
+                    console.error('Prediction error:', error);
+                    document.getElementById('predictionText').textContent = 'Prediction error';
+                }
+            }
+
+            updateMetrics() {
+                document.getElementById('fps').textContent = this.metrics.fps;
+                document.getElementById('inferenceTime').textContent = `${this.metrics.inferenceTime}ms`;
+                document.getElementById('landmarksCount').textContent = this.metrics.landmarksCount;
+            }
+
+            updateStatus(message, type) {
+                const statusEl = document.getElementById('status');
+                statusEl.textContent = message;
+                statusEl.className = `status ${type}`;
+                statusEl.style.display = 'block';
+                
+                setTimeout(() => {
+                    statusEl.style.display = 'none';
+                }, 5000);
+            }
+
+            enterTrainingMode() {
+                alert('Training mode would allow you to record samples and improve the model. This is a demonstration version.');
+            }
+        }
+
+        // Initialize the system when page loads
+        window.addEventListener('load', () => {
+            new LipReadingSystem();
+        });
+    </script>
+</body>
+</html>
